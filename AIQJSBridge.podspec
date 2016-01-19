@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = "AIQJSBridge"
-  s.version          = "1.0.0"
+  s.version          = "1.0.1"
   s.summary          = "Provides JavaScript access to AppearIQ cloud services."
   s.homepage         = "https://github.com/appear/AIQJSBridge"
   s.license          = 'MIT'
