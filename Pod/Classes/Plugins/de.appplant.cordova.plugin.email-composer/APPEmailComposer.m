@@ -23,6 +23,10 @@
 #import "Cordova/NSData+Base64.h"
 #import "Cordova/CDVAvailability.h"
 #import <MobileCoreServices/MobileCoreServices.h>
+#import <AssetsLibrary/AssetsLibrary.h>
+#import <AIQCoreLib/NSURL+Helpers.h>
+#import <AIQCoreLib/AIQSession.h>
+#import <AIQCoreLib/AIQDataStore.h>
 
 #include "TargetConditionals.h"
 
@@ -295,6 +299,13 @@
     {
         return [self dataFromBase64:path];
     }
+    else if ([path hasPrefix:@"assets-library://"])
+    {
+        return [self dataForAssetInLibrary:path];
+    }
+    else if ([path hasPrefix:@"aiq-"]) {
+        return [NSData dataWithContentsOfURL:[NSURL URLWithString:path]];
+    }
 
     NSFileManager* fileManager = [NSFileManager defaultManager];
 
@@ -303,6 +314,38 @@
     }
 
     return [fileManager contentsAtPath:path];
+}
+
+/**
+ * Retrieves the data for a URL in the assets library.
+ *
+ * @param path
+ *      A URL to the asset in the assets library
+ *
+ * @return
+ *      The data for the asset
+ */
+- (NSData*) dataForAssetInLibrary:(NSString*)path
+{
+    
+    dispatch_group_t group = dispatch_group_create();
+    dispatch_group_enter(group);
+    __block NSData *data = nil;
+    
+    ALAssetsLibrary *assetLibrary = [[ALAssetsLibrary alloc] init];
+    [assetLibrary assetForURL:[NSURL URLWithString:path] resultBlock:^(ALAsset *asset) {
+        ALAssetRepresentation *rep = [asset defaultRepresentation];
+        Byte *buffer = (Byte*)malloc(rep.size);
+        NSUInteger buffered = [rep getBytes:buffer fromOffset:0.0 length:rep.size error:nil];
+        data = [NSData dataWithBytesNoCopy:buffer length:buffered freeWhenDone:YES];
+        dispatch_group_leave(group);
+    } failureBlock:^(NSError *error) {
+        dispatch_group_leave(group);
+    }];
+    
+    dispatch_group_wait(group, DISPATCH_TIME_FOREVER);
+    
+    return data;
 }
 
 /**
@@ -469,10 +512,32 @@
 
         return [pathWithoutPrefix substringToIndex:
                 [pathWithoutPrefix rangeOfString:@"//"].location];
+    } else if ([path hasPrefix:@"aiq-"]) {
+        NSURL *url = [NSURL URLWithString:path];
+        NSDictionary *params = [url queryAsDictionary];
+        NSString *name = params[@"name"];
+        NSString *identifier = params[@"identifier"];
+        NSString *solution = params[@"solution"];
+        AIQDataStore *store = [[AIQSession currentSession] dataStoreForSolution:solution error:nil];
+        if (! store) {
+            return name;
+        }
+        NSDictionary *attachment = [store attachmentWithName:name forDocumentWithId:identifier error:nil];
+        [store close];
+        if (! attachment) {
+            return name;
+        }
+        NSArray *components = [attachment[kAIQAttachmentContentType] componentsSeparatedByString:@"/"];
+        if (components.count < 2) {
+            return name;
+        }
+        
+        // mail composer dialog won't show image previews if their names don't have a proper extension
+        // because it's stupid
+        return [name stringByAppendingFormat:@".%@", components.lastObject];
     }
-
-    return path;
-
+    
+    return [NSURL URLWithString:path].pathComponents.lastObject;
 }
 
 /**
