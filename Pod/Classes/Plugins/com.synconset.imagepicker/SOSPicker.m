@@ -7,6 +7,7 @@
 //
 
 #import <AIQCoreLib/AIQSession.h>
+#import <ImageIO/ImageIO.h>
 
 #import "SOSPicker.h"
 #import "ELCAlbumPickerController.h"
@@ -98,6 +99,18 @@ typedef enum : NSUInteger {
             } else {
                 UIImage* scaledImage = [self imageByScalingNotCroppingForSize:image toSize:targetSize];
                 data = UIImageJPEGRepresentation(scaledImage, self.quality/100.0f);
+            }
+            
+            if (assetRep.metadata) {
+                CGImageSourceRef sourceImage = CGImageSourceCreateWithData((__bridge CFDataRef)data, NULL);
+                CFStringRef sourceType = CGImageSourceGetType(sourceImage);
+                
+                CGImageDestinationRef destinationImage = CGImageDestinationCreateWithData((__bridge CFMutableDataRef)data, sourceType, 1, NULL);
+                CGImageDestinationAddImageFromSource(destinationImage, sourceImage, 0, (__bridge CFDictionaryRef)assetRep.metadata);
+                CGImageDestinationFinalize(destinationImage);
+                
+                CFRelease(sourceImage);
+                CFRelease(destinationImage);
             }
 
             if (![data writeToFile:filePath options:NSAtomicWrite error:&err]) {
