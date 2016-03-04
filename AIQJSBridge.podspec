@@ -1,11 +1,11 @@
 Pod::Spec.new do |s|
   s.name             = 'AIQJSBridge'
-  s.version          = '1.0.2'
+  s.version          = '1.0.3'
   s.summary          = "Provides JavaScript access to AppearIQ cloud services."
   s.homepage         = "https://github.com/appear/AIQJSBridge"
   s.license          = 'MIT'
   s.author           = { "Appear Networks AB" => "ios@appearnetworks.com" }
-  s.source           = { :git => "https://github.com/appear/AIQJSBridge.git", :tag => s.version.to_s }
+  s.source           = { git: "https://github.com/appear/AIQJSBridge.git", tag: s.version.to_s }
   s.social_media_url = 'https://twitter.com/appear'
 
   s.platform     = :ios, '8.0'
