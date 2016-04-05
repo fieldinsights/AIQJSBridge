@@ -5,12 +5,17 @@
 
 #import "AIQImagingPlugin.h"
 #import "UIImage+Helpers.h"
+#import "CLImageEditor.h"
 #import "AIQLaunchableViewController.h"
 
-@interface AIQImagingPlugin () <UINavigationControllerDelegate, UIImagePickerControllerDelegate, UIPopoverControllerDelegate>
+@interface AIQImagingPlugin () <UINavigationControllerDelegate,
+UIImagePickerControllerDelegate,
+UIPopoverControllerDelegate,
+CLImageEditorDelegate>
 
 @property (nonatomic, retain) NSString *documentId;
 @property (nonatomic, retain) UIImagePickerController *imagePicker;
+@property (nonatomic, retain) CLImageEditor *imageEditor;
 @property (nonatomic, retain) UIPopoverController *popoverController;
 @property (nonatomic, retain) CDVInvokedUrlCommand *command;
 
@@ -76,6 +81,51 @@
     }
 }
 
+-(void)edit:(CDVInvokedUrlCommand *)command
+{
+    NSString *imageUri = [command argumentAtIndex:0 withDefault:nil andClass:[NSString class]];
+    NSString *solution = ((AIQLaunchableViewController *)self.viewController).solution;
+
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSError *error = nil;
+        AIQDataStore *dataStore = [[AIQSession currentSession] dataStoreForSolution:solution error:&error];
+
+        if (! dataStore) {
+            AIQLogCError(2, @"Error retrieving data store: %@", error.localizedDescription);
+            [self failWithError:error command:command];
+            return;
+        }
+
+        NSData* imageData = [dataStore dataForAttachmentAtPath:imageUri];
+
+        if (! imageData) {
+            AIQLogCError(2, @"Error loading image data");
+            [self failWithError:nil command:command];
+            return;
+        }
+
+        UIImage *image = [UIImage imageWithData:imageData];
+
+        if (! image) {
+            AIQLogCError(2, @"Error loading image data");
+            [self failWithError:nil command:command];
+            return;
+        }
+
+        dispatch_sync(dispatch_get_main_queue(), ^{
+            AIQLogCInfo(2, @"Editing image at %@", imageUri);
+            _command = command;
+
+            _imageEditor = [[CLImageEditor alloc] initWithImage:image];
+            _imageEditor.delegate = self;
+
+            UIViewController *root = [[UIApplication sharedApplication].delegate window].rootViewController;
+            [[UIApplication sharedApplication] setStatusBarHidden:YES withAnimation:UIStatusBarAnimationSlide];
+            [root presentViewController:_imageEditor animated:YES completion:nil];
+        });
+    });
+}
+
 #pragma mark - UIImagePickerControllerDelegate
 
 - (void)imagePickerController:(UIImagePickerController *)picker didFinishPickingMediaWithInfo:(NSDictionary *)info {
@@ -132,6 +182,27 @@
     _popoverController = nil;
     _imagePicker = nil;
     
+    CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:@{@"cancel": @YES}];
+    [self.commandDelegate sendPluginResult:result callbackId:_command.callbackId];
+}
+
+#pragma mark - CLImageEditor delegate
+
+- (void) imageEditor:(CLImageEditor *)editor didFinishEdittingWithImage:(UIImage *)image {
+    AIQLogCInfo(2, @"Done editing image");
+
+    [[UIApplication sharedApplication] setStatusBarHidden:NO withAnimation:UIStatusBarAnimationSlide];
+    [_imageEditor dismissViewControllerAnimated:YES completion:^{
+        _imageEditor = nil;
+        [self completeWithImage:image];
+    }];
+}
+
+- (void) imageEditorDidCancel:(CLImageEditor *)editor {
+    [[UIApplication sharedApplication] setStatusBarHidden:NO withAnimation:UIStatusBarAnimationSlide];
+    [_imageEditor dismissViewControllerAnimated:YES completion:nil];
+    _imageEditor = nil;
+
     CDVPluginResult *result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsDictionary:@{@"cancel": @YES}];
     [self.commandDelegate sendPluginResult:result callbackId:_command.callbackId];
 }
