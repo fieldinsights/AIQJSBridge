@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'AIQJSBridge'
-  s.version          = '1.0.3'
+  s.version          = '1.0.4'
   s.summary          = "Provides JavaScript access to AppearIQ cloud services."
   s.homepage         = "https://github.com/appear/AIQJSBridge"
   s.license          = 'MIT'
@@ -17,8 +17,9 @@ Pod::Spec.new do |s|
   }
 
   s.public_header_files = 'Pod/Classes/**/AIQ*.h'
-  s.dependency 'AIQCoreLib', '~> 1.5.2'
+  s.dependency 'AIQCoreLib', '~> 1.5.3'
   s.dependency 'Google/Analytics'
+  s.dependency 'CLImageEditor'
 
   s.subspec 'Cordova' do |ss|
     ss.source_files = 'Cordova/Classes/**/*'
